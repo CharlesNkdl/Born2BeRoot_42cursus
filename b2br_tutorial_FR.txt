@@ -1,0 +1,234 @@
+***** Born 2 Be Root de Cnikdel ****
+
+//////////*****************////////////////////************************///////////////////////********************///////////////////****************
+
+1) Dl l'iso, !! le monter en cd !!, saisir install et partionnement 
+
+	a) hostname du coup = cnikdel42
+	b) user = cnikdel
+	c) mdp = Born2BeRoot!
+	Partitionnement bonus :
+		* Manual
+		* 1 Primary = 500 mo , mount /boot pour l'OS
+		* 2 Volume = max, pas de mount
+		* Crypter le volume 
+		* creer un volume group = LVMGroup
+		* Dedans les partitions logique = root, swap, home, var, srv( pas ext 4 mais SWAP), tmp ,var-log (chemin de mount ecrit manuellement /var/log )
+	On continue
+	!!! ON RETIRE TOUT LES PACKAGES!!!
+	On Dl grub
+DL man : 
+	sudo apt-get update
+	sudo apt-get install man-db
+2) SUDO :
+
+	a) On se connecter en root : su -
+	b) apt install sudo puis reboot
+	c) Pour check si ca a bien dl faire une ptite commande sudo voir si ca marche
+	d) on cree un groupe : sudo addgroup user42
+	e) Puis on se mets dans le groupe : sudo et user 42 via sudo adduser cnikdel user42 puis sudo
+		Commandes cool pour duo : 
+		* sudo adduser nom, pour rajouter un user 
+		* sudo addgroup nomgrp, pour rajouter un groupe : On peut genre creer un groupe avec des droits sudos modifies pour eviter de tout reconfig a chaque fois
+		* Si on veut voir les groupes et les gens dedans : cat /etc/group ou nano /etc/group pour voir le fichier 
+		* Pour mettre un user dans un groupe : sudo adduser sonnom nmdugrp
+
+2b) SUDO CONFIG : 
+
+	a) Alors on peut faire visudo et modif directement mais askip mauvaise pratique, c'est le fichier qui le dit
+	b) on va alors creer un fichiers dans /etc/sudoers.d/ avec le nom qu'on veut au final
+	c) avant de remplir le fichier, on va creer un dir sudo dans /var/log/ pour stocker du coup les logs de d'utilisation de sudo
+	d) On va maintenant ecrire dans notre dossier de regle dans sudoers :
+
+		Defaults	passwd_tries = 3	=> nb d'essais
+		Defaults	badpass_message = " faux mdp"	=> message perso d'erreur
+		Defaults	logfile="/var/log/sudo/nomdufichdelog"		=> la on seront stockes les logs, plus generaux
+		Defaults	log_input, log_output		=> pour dire a sudo de stocker les logs
+		Defaults	iolog_dir="/var/log/sudo"	=> va stocker les logs mais detailles d'entree et de sortie
+		Defaults	requiretty	=> dit que le sudo a besoin d'avoir un terminal pour faire les commandes , empeche script auto ou processus d'arriere plan
+		Defaults	secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin" => Il faut que toute les commandes que le sudo va utiliser se trouve dans ses directories
+
+
+3) SSH (Secure Shell)
+
+	"SSH (Secure Shell) est un protocole de communication sécurisé utilisé pour accéder à des ordinateurs distants sur un réseau. 
+	Il permet à un utilisateur de se connecter à un serveur distant de manière sécurisée et d'exécuter des commandes sur celui-ci. 
+	SSH chiffre toutes les données transmises entre le client et le serveur. 
+	Offrant ainsi une protection contre les attaques de type interception et manipulation de données. 
+	Il est souvent utilisé pour administrer des serveurs à distance de manière sécurisée, 
+	mais également pour transférer des fichiers de manière sécurisée via le protocole SFTP (SSH File Transfer Protocol)"
+
+	a) sudo apt update pour les maj
+	b) sudo apt install openssh-server
+	c) Pour check = sudo service ssh status
+	d) mais en soit : on modif /etc/ssh/ssh_config port 4242 et permitrootlogin no
+	e) sudo service ssh restart puis status, avec un ptit reboot tant qu'on y est
+4) UFW
+	a) sudo apt install ufw
+	b) sudo ufw enable
+	c) sudo ufw allow 4242
+	d) sudo ufw status pour check
+
+5) LA CONNEXION
+	a) configurations dans le panneau de VM
+	b) Reseau => Config avances => Port => on rajoute port 4242
+	c) Commande pour se connecter ssh nom@localhost -p 4242 ou ssh nom@ip -p 4242 , ip que l'on voit en faisant ip a dans la VM
+
+6) PASSWORD
+	a) on va modif le fichier de logins = /etc/login.defs
+	b) Pass max days = 30 , pass min days = 2 , pass warn age normalement deja a 7
+	c) Pour les settings de password il faut un package : sudo apt install libpam-pwquality
+	d) on va modif le dossier : /etc/pam.d/common-password
+	e) apres retry=3 et sur la meme ligne :
+		* minlen=10
+		* ucredit=-1
+		* dcredit=-1
+		* maxrepeat=3
+		* reject_username
+		* difok=7
+		* enforce_for_root
+	Pour tester password : faire un new user ou sudo passwd -e nom
+		test mdp = Mlaval789*
+
+7) LE SCRIPT
+
+	1) Architecture de l'OS + version kernel
+
+		cmd :	uname -a
+
+	uname = commande unix qui affiche informations systemes, flag -a pour all
+		
+	2) Nbr processeurs physiques
+
+		cmd : grep "physical id" /proc/cpuinfo | wc -l
+
+	grep = Recherche des chaines de carac dans des fichiers ou flux de donnes
+	wc = renvoie nbr de lignes, mot et caracteres, avec le flag -l, juste le nombre de ligne
+
+	3) Nbr processeurs virtuels
+
+		cmd : grep processor /proc/cpuinfo | wc -l
+
+	meme logique que 2)
+
+	4) RAM dispo sur le serveur + taux d'utilisation en %
+
+		cmd : free -m | awk '$1 == "Mem:" {printf("(%.2f%%)\n", $3/$2*100)}'
+
+	free = renvoie tableau d'info sur la ram, utilise, reserve et libre 
+	flag -m = pour passer de kb a mb comme demande
+	awk = extrait, manipule et formate des donnes textuelles, on peut en faire des sorts de mini fonctions ! abuse
+		la syntaxe est un peu bizarre
+		'$1 == "Mem:" > permet de selectionner seulement la ligne qui commence par mem
+		printf("(%.2f%%)\n", $3/$2*100) > %.2f = un float avec precision 2 decimale
+						> calcul = $2 = qte totale de memoire $3 = qte de memoire utilise
+						> permet d'obtenir un pourcentage
+
+	5) Memoire dispo sur le serveur + %
+
+		cmd pour memoire utilise : df -m | grep "/dev/" | grep -v "/boot" | awk '{memory_use += $3} END {print memory_use}'
+		cmd pour memoire total : df -m | grep "/dev/" | grep -v "/boot" | awk '{memory_result += $2} END {printf ("%.0fGb\n", memory_result/1024}'
+		cmd pour % : df -m | grep "/dev/" | grep -v "/boot" | awk '{use += $3} {total += $2} END {printf("(%d%%)\n"), use/total*100}'
+
+	df = disk free, affiche la valeur d'espace dispo
+	-m = en mb
+	grep 'dev' = permet de filtrer et de n'inclure que les partitions de stockage sinon on peut inclure des fichiers virtuels comme proc ou sys, ce qu'il faut eviter
+	grep -v 'boot' = -v permet d'exclure, on veut pas de boot parce que c'est pas vraiment de l'espace libre
+	END = dit a la fonction de traiter toutes les donnes avant de renvoyer 
+	/1024 = pour mettre en gb
+	
+	6) taux utilis CPU sous %
+
+		cmd : vmstat | tail -1 | awk '{printf("(%.1f%%)\n", (100-$15)}'
+
+	vmstat = montre les stats system en general
+	tail -1 = juste la derniere ligne
+	awk print $15 = imprime juste le 15eme mot qui est la memoire de cpu libre, on va du coup faire 100 - $15 pour avoir le resultat
+	
+	7) Date et heure dernier reboot
+
+		cmd : who -b | awk '$1 == "system" {print $3 " " $4}'
+
+	who = permet d'afficher les utilisateurs connectes et les terminaux ouvert
+	-b = permet d'obtenir le dernier reboot 
+	'$1 == "system" permet de check la ligne qui commence par system
+	puis imprime $3 = date et $4 = heure, separe d'un espace
+
+	8) Si LVM est actif ou pas
+
+		cmd : if [ $(lsblk | grep "lvm" | wc -l) -gt 0 ]; then echo yes; else echo no; fi
+
+	ptite condition if = lie au resultat de wc -l, comparer du coup a -gt 0, then echo yes si > 0 ou echo no si 0 grosso modo
+	le fi, represente juste la fin de la condition if
+	lsblk : comme la commande pour check le partionnement, permet de tout montrer
+	grep lvm = on va grep, lbm qui est du coup le type quand le stockage est partionne par lvm ( on peut le voir dans les examples) 
+	wc -l pour compter toujours
+	
+	9) Nbr de connexions
+
+		cmd : ss -ta | grep ESTAB | wc -l
+
+	ss :  commande de surveillances des connexions reseau, peux afficher les connexions tcp
+	flag -t = juste les tcp et flag -a, toute, meme la notre
+	Grep ESTAB  + wc -l : va compter seulement les connexions etablies
+
+	10) Nbr d'utilisateurs
+
+		cmd : users | wc -w
+
+	users : va afficher le noms des utilisaters connectes
+	wc -l : compte le nombre de mot 
+	
+	11) Adresse IPv4 + MAC
+
+		cmd IPV4 :  ????? A VOIR
+		cmd MAC : ip link | grep /ether | awk '{print $2}'
+
+	MAC = Media access control = identifiant unique a une carte reseau ou interface reseau
+	ip link : affiche les interfaces reseau dispo, l'adresse mac est apres link/ether 
+
+	12) Nombre de commande sudo
+
+		cmd : journalctl _COMM=sudo | grep COMMAND | wc -l)
+
+	Si on veut flex, cat le fichier de log qu'on a cree | grep COMMAND | wc -l
+	mais il manquera les infos sudo d'avant qu'on le mette en place
+	journalctl : permet de lire et d'affiche les journaux systemes
+	_COMM=sudo = que les sudo
+	grep COMMAND pour que quand y a des commandes
+	wc -l pour les compter
+
+MAINTENANT :
+	Faire un gros fichier avec les alias pour pouvoir imprimer tout ca et le setup avec cron
+Copier la structure du sujet puis wall : wall permet d'envoyer un mess a tout les utilisateurs !
+wall "	#Architecture: Linux wil 4.19.0-16-amd64 #1 SMP Debian 4.19.181-1 (2021-03-19) x86_64 GNU/Linux
+	#CPU physical : 1
+	#vCPU : 1
+	#Memory Usage: 74/987MB (7.50%)
+	#Disk Usage: 1009/2Gb (39%)
+	#CPU load: 6.7%
+	#Last boot: 2021-04-25 14:45
+	#LVM use: yes
+	#Connexions TCP : 1 ESTABLISHED
+	#User log: 1
+	#Network: IP 10.0.2.15 (08:00:27:51:9b:a5)
+	#Sudo : 42 cmd "
+Et du coup remplacer les valeurs par des alias des commandes et c'est tout bon normalement 
+Ne pas oublier #!/bin/bash au debut du script pour bien informer le shell
+
+8) Cron
+sudo crontab -u root -e pour lancer
+*/10 * * * * sh route du script
+
+9) NE PAS OUBLIER DE SHA1SUM LA SIGNATURE DU FICHIER ET DE SNAPSHOT
+
+mdp Born2BeCharles!
+
+
+
+
+
+
+	
+	
+
